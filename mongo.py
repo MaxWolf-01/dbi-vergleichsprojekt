@@ -1,5 +1,5 @@
-import time
 from functools import wraps
+from timeit import Timer
 from typing import Any, Callable, Optional
 
 import pymongo
@@ -10,7 +10,7 @@ from testcontainers.mongodb import MongoDbContainer
 faker: Faker = Faker()
 
 
-def mongo_performance_test(init_func: Optional[Callable] = None) -> Callable:
+def mongo_performance_test(init_func: Optional[Callable] = None, n_tests: int = 200) -> Callable:
     def decorator(test_func: Callable) -> Callable:
         @wraps(test_func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -22,14 +22,14 @@ def mongo_performance_test(init_func: Optional[Callable] = None) -> Callable:
                 if init_func:
                     init_func(mongo_db)
 
-                start_time: float = time.perf_counter()
-                result: Any = test_func(mongo_db, *args, **kwargs)
-                end_time: float = time.perf_counter()
+                def to_time():
+                    test_func(mongo_db, *args, **kwargs)
 
-                time_taken: float = end_time - start_time
+                timer = Timer(to_time)
+                time_taken = timer.timeit(number=n_tests)
+
                 print(f"'{test_func.__name__}' Completed - Time taken: {time_taken:.4f} seconds")
-
-                return result
+                return time_taken
 
         return wrapper
 
