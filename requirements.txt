@@ -1,0 +1,4 @@
+pymongo[srv]
+psycopg2-binary
+testcontainers
+faker
