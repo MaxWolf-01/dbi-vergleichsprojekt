@@ -10,7 +10,7 @@ from testcontainers.mongodb import MongoDbContainer
 faker: Faker = Faker()
 
 
-def with_mongo_performance_test(test_func: Callable) -> Callable:
+def mongo_performance_test(test_func: Callable) -> Callable:
     @wraps(test_func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         with MongoDbContainer() as mongo:
@@ -30,7 +30,7 @@ def with_mongo_performance_test(test_func: Callable) -> Callable:
     return wrapper
 
 
-@with_mongo_performance_test
+@mongo_performance_test
 def test_data_insertion_performance(mongo_db: Database) -> None:
     collection = mongo_db.test_collection
 
