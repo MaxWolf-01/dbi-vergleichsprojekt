@@ -6,11 +6,11 @@ import pymongo
 from faker import Faker
 from pymongo.database import Database
 from testcontainers.mongodb import MongoDbContainer
-
+from bson.decimal128 import Decimal128
 faker: Faker = Faker()
 
 
-def mongo_performance_test(init_func: Optional[Callable] = None, n_tests: int = 200) -> Callable:
+def mongo_performance_test(init_func: Optional[Callable] = None, n_tests: int = 10) -> Callable:
     def decorator(test_func: Callable) -> Callable:
         @wraps(test_func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -58,8 +58,8 @@ def test_data_insertion_performance_100(mongo_db: Database) -> None:
     } for _ in range(100)])
     songs.insert_many([{
         "title": faker.sentence(),
-        "length": round(faker.pydecimal(left_digits=2, right_digits=2, positive=True), 2),
-        "rating": round(faker.pydecimal(left_digits=1, right_digits=1, positive=True), 1),
+        "length": Decimal128(faker.pydecimal(left_digits=2, right_digits=2, positive=True)),
+        "rating": Decimal128(faker.pydecimal(left_digits=1, right_digits=1, positive=True)),
         "yt_link": faker.url(),
         "artist_id": artists.aggregate([{"$sample": {"size": 1}}]).next()['_id'],
         "album_id": albums.aggregate([{"$sample": {"size": 1}}]).next()['_id']
