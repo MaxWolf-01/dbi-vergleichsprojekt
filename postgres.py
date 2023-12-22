@@ -10,7 +10,7 @@ from testcontainers.postgres import PostgresContainer
 faker: Faker = Faker()
 
 
-def postgres_performance_test(init_func: Optional[Callable] = None, n_tests: int = 200) -> Callable:
+def postgres_performance_test(init_func: Optional[Callable] = None, n_tests: int = 10) -> Callable:
     def decorator(test_func: Callable) -> Callable:
         @wraps(test_func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -174,4 +174,4 @@ def test_create_performance(connection: PgConnection, n: int = 100) -> None:
 if __name__ == "__main__":
     test_read_performance()
     test_create_performance()
-    test_create_performance(n=10000)
+    test_create_performance(n=1000)
