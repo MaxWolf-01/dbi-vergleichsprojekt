@@ -42,59 +42,65 @@ def postgres_performance_test(init_func: Optional[Callable] = None, n_tests: int
 def create_postgres_schema(conection: PgConnection) -> None:
     with conection.cursor() as cursor:
         cursor.execute("""
-            CREATE TABLE A_Artists (
-                A_ID SERIAL PRIMARY KEY,
-                A_Name VARCHAR
-            );
+          CREATE TABLE A_Artists (
+            A_ID SERIAL PRIMARY KEY,
+            A_Name VARCHAR
+        );
 
-            CREATE TABLE Al_Albums (
-                Al_ID SERIAL PRIMARY KEY,
-                Al_Name VARCHAR
-            );
+        CREATE TABLE Al_Albums (
+            Al_ID SERIAL PRIMARY KEY,
+            Al_Name VARCHAR
+        );
 
-            CREATE TABLE P_Playlists (
-                P_ID SERIAL PRIMARY KEY,
-                P_Name VARCHAR
-            );
+        CREATE TABLE Al_Albums_have_A_Artists (
+            Al_A_ID SERIAL PRIMARY KEY,
+            Al_ID INTEGER REFERENCES Al_Albums(Al_ID),
+            A_ID INTEGER REFERENCES A_Artists(A_ID)
+        );
 
-            CREATE TABLE S_Songs (
-                S_ID SERIAL PRIMARY KEY,
-                S_Title VARCHAR,
-                S_Length DECIMAL(5,2),
-                S_Rating DECIMAL(2,1),
-                S_YT_Link VARCHAR,
-                S_A_ID INTEGER REFERENCES A_Artists(A_ID),
-                S_Al_ID INTEGER REFERENCES Al_Albums(Al_ID)
-            );
+        CREATE TABLE P_Playlists (
+            P_ID SERIAL PRIMARY KEY,
+            P_Name VARCHAR
+        );
 
-            CREATE TABLE P_Playlists_have_S_Songs (
-                P_S_ID SERIAL PRIMARY KEY,
-                P_ID INTEGER REFERENCES P_Playlists(P_ID),
-                S_ID INTEGER REFERENCES S_Songs(S_ID)
-            );
+        CREATE TABLE S_Songs (
+            S_ID SERIAL PRIMARY KEY,
+            S_Title VARCHAR,
+            S_Length DECIMAL(5,2),
+            S_Rating DECIMAL(2,1),
+            S_YT_Link VARCHAR,
+            S_Al_ID INTEGER REFERENCES Al_Albums(Al_ID)
+        );
 
-            -- View for Songs in a Playlist
-            CREATE VIEW SongsInAPlaylist AS
-            SELECT
-                P_Playlists.P_Id,
-                P_Playlists.P_Name,
-                S_Songs.S_Id,
-                S_Songs.S_Title,
-                S_Songs.S_Length,
-                S_Songs.S_Rating,
-                S_Songs.S_YT_Link,
-                A_Artists.A_Id,
-                A_Artists.A_Name,
-                Al_Albums.Al_Id,
-                Al_Albums.Al_Name
-            FROM
-                P_Playlists
-                JOIN P_Playlists_have_S_Songs ON P_Playlists.P_Id = P_Playlists_have_S_Songs.P_Id
-                JOIN S_Songs ON P_Playlists_have_S_Songs.S_Id = S_Songs.S_Id
-                LEFT JOIN A_Artists ON S_Songs.S_A_Id = A_Artists.A_Id
-                LEFT JOIN Al_Albums ON S_Songs.S_Al_Id = Al_Albums.Al_Id
-            ORDER BY
-                P_Playlists.P_Id, S_Songs.S_Id;
+        CREATE TABLE P_Playlists_have_S_Songs (
+            P_S_ID SERIAL PRIMARY KEY,
+            P_ID INTEGER REFERENCES P_Playlists(P_ID),
+            S_ID INTEGER REFERENCES S_Songs(S_ID)
+        );
+
+        -- View for Songs in a Playlist
+        CREATE VIEW SongsInAPlaylist AS
+        SELECT
+            P_Playlists.P_Id,
+            P_Playlists.P_Name,
+            S_Songs.S_Id,
+            S_Songs.S_Title,
+            S_Songs.S_Length,
+            S_Songs.S_Rating,
+            S_Songs.S_YT_Link,
+            A_Artists.A_Id,
+            A_Artists.A_Name,
+            Al_Albums.Al_Id,
+            Al_Albums.Al_Name
+        FROM
+            P_Playlists
+            JOIN P_Playlists_have_S_Songs ON P_Playlists.P_Id = P_Playlists_have_S_Songs.P_Id
+            JOIN S_Songs ON P_Playlists_have_S_Songs.S_Id = S_Songs.S_Id
+            LEFT JOIN Al_Albums ON S_Songs.S_Al_ID = Al_Albums.Al_Id
+            LEFT JOIN Al_Albums_have_A_Artists ON Al_Albums.Al_Id = Al_Albums_have_A_Artists.Al_Id
+            LEFT JOIN A_Artists ON Al_Albums_have_A_Artists.A_Id = A_Artists.A_Id
+        ORDER BY
+        P_Playlists.P_Id, S_Songs.S_Id;
         """)
     conection.commit()
 
@@ -116,14 +122,13 @@ def insert_fake_data_postgres(connection: PgConnection, num_entries: int = 100) 
 
             # Inserting Songs
             song_title = faker.sentence()
+            song_title = faker.sentence()
             song_length = round(faker.pydecimal(left_digits=2, right_digits=2, positive=True), 2)
             song_rating = round(faker.pydecimal(left_digits=1, right_digits=1, positive=True), 1)
             yt_link = faker.url()
-            cursor.execute("""
-                INSERT INTO S_Songs (S_Title, S_Length, S_Rating, S_YT_Link, S_A_ID, S_Al_ID) 
-                VALUES (%s, %s, %s, %s, (SELECT A_ID FROM A_Artists ORDER BY RANDOM() LIMIT 1), 
-                (SELECT Al_ID FROM Al_Albums ORDER BY RANDOM() LIMIT 1))""",
-                           (song_title, song_length, song_rating, yt_link))
+            cursor.execute("""INSERT INTO S_Songs (S_Title, S_Length, S_Rating, S_YT_Link, S_Al_ID) 
+                VALUES (%s, %s, %s, %s, (SELECT Al_ID FROM Al_Albums ORDER BY RANDOM() LIMIT 1))
+                """, (song_title, song_length, song_rating, yt_link))
     connection.commit()
 
 
@@ -139,6 +144,34 @@ def test_read_performance(connection: PgConnection) -> None:
         _ = cursor.fetchall()
 
 
+@postgres_performance_test()
+def test_create_performance(connection: PgConnection, n: int = 100) -> None:
+    cursor = connection.cursor()
+    for _ in range(n):  # Adjust for scalability
+        cursor.execute("INSERT INTO A_Artists (A_Name) VALUES (%s) RETURNING A_ID;", (faker.name(),))
+        artist_id = cursor.fetchone()[0]
+
+        cursor.execute("INSERT INTO Al_Albums (Al_Name) VALUES (%s) RETURNING Al_ID;", (faker.word(),))
+        album_id = cursor.fetchone()[0]
+
+        cursor.execute("INSERT INTO Al_Albums_have_A_Artists (Al_ID, A_ID) VALUES (%s, %s);", (album_id, artist_id))
+
+        cursor.execute("INSERT INTO P_Playlists (P_Name) VALUES (%s) RETURNING P_ID;", (faker.word(),))
+        playlist_id = cursor.fetchone()[0]
+
+        cursor.execute("""
+            INSERT INTO S_Songs (S_Title, S_Length, S_Rating, S_YT_Link, S_Al_ID) 
+            VALUES (%s, %s, %s, %s, %s) RETURNING S_ID;
+            """, (
+        faker.sentence(), faker.random_number(digits=2), faker.random_number(digits=1), faker.url(), album_id))
+        song_id = cursor.fetchone()[0]
+
+        cursor.execute("INSERT INTO P_Playlists_have_S_Songs (P_ID, S_ID) VALUES (%s, %s);", (playlist_id, song_id))
+    connection.commit()
+    cursor.close()
+
+
 if __name__ == "__main__":
-    test_data_insertion_performance()
     test_read_performance()
+    test_create_performance()
+    test_create_performance(n=10000)
