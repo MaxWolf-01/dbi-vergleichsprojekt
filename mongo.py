@@ -36,27 +36,63 @@ def mongo_performance_test(init_func: Optional[Callable] = None, n_tests: int = 
     return decorator
 
 
-def init_mongo_db(mongo_db: Database) -> None:
-    collection = mongo_db.test_collection
-    # Seed the database with data
-    collection.insert_many([{"number": i} for i in range(1000)])
+# def init_mongo_db(mongo_db: Database) -> None:
+#     collection = mongo_db.test_collection
+#     # Seed the database with data
+#     collection.insert_many([{"number": i} for i in range(1000)])
 
 
 @mongo_performance_test()
-def test_data_insertion_performance(mongo_db: Database) -> None:
-    collection = mongo_db.test_collection
+def test_data_insertion_performance_100(mongo_db: Database) -> None:
+    artists = mongo_db.artists
+    albums = mongo_db.albums
+    songs = mongo_db.songs
+    playlists = mongo_db.playlists
+    artists_albums = mongo_db.artists_albums
+    songs_playlists = mongo_db.songs_playlists
 
-    for i in range(1000):
-        collection.insert_one({"number": i})
+    albums.insert_many([{"name": faker.catch_phrase()} for _ in range(100)])
+    artists.insert_many([{
+        "name": faker.name(),
+        "albums": [albums.aggregate([{"$sample": {"size": 1}}]).next()['_id'] for _ in range(5)]
+    } for _ in range(100)])
+    songs.insert_many([{
+        "title": faker.sentence(),
+        "length": round(faker.pydecimal(left_digits=2, right_digits=2, positive=True), 2),
+        "rating": round(faker.pydecimal(left_digits=1, right_digits=1, positive=True), 1),
+        "yt_link": faker.url(),
+        "artist_id": artists.aggregate([{"$sample": {"size": 1}}]).next()['_id'],
+        "album_id": albums.aggregate([{"$sample": {"size": 1}}]).next()['_id']
+    } for _ in range(100)])
+    playlists.insert_many([{
+        "name": faker.catch_phrase(),
+        "songs": [songs.aggregate([{"$sample": {"size": 1}}]).next()['_id'] for _ in range(5)]
+    } for _ in range(100)])
+    artists_albums.insert_many([{
+        "artist_id": artists.aggregate([{"$sample": {"size": 1}}]).next()['_id'],
+        "album_id": albums.aggregate([{"$sample": {"size": 1}}]).next()['_id']
+    } for _ in range(100)])
+    songs_playlists.insert_many([{
+        "song_id": songs.aggregate([{"$sample": {"size": 1}}]).next()['_id'],
+        "playlist_id": playlists.aggregate([{"$sample": {"size": 1}}]).next()['_id']
+    } for _ in range(100)])
 
 
-@mongo_performance_test(init_func=init_mongo_db)
+# @mongo_performance_test()
+# def test_data_insertion_performance(mongo_db: Database) -> None:
+#     collection = mongo_db.test_collection
+#
+#     for i in range(1000):
+#         collection.insert_one({"number": i})
+
+
+@mongo_performance_test(init_func=test_data_insertion_performance_100)
 def test_read_performance(mongo_db: Database) -> None:
-    collection = mongo_db.test_collection
+    artists = mongo_db.artists
     # Performance testing for read operations
-    _ = collection.find({})
+    _ = artists.find({})
 
 
 if __name__ == "__main__":
-    test_data_insertion_performance()
+    test_data_insertion_performance_100()
     test_read_performance()
