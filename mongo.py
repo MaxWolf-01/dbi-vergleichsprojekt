@@ -36,46 +36,41 @@ def mongo_performance_test(init_func: Optional[Callable] = None, n_tests: int = 
     return decorator
 
 
-# def init_mongo_db(mongo_db: Database) -> None:
-#     collection = mongo_db.test_collection
-#     # Seed the database with data
-#     collection.insert_many([{"number": i} for i in range(1000)])
+def init_mongo_db(mongo_db: Database) -> None:
+    collection = mongo_db.test_collection
+    # Seed the database with data
+    collection.insert_many([{"number": i} for i in range(1000)])
 
 
 @mongo_performance_test()
-def test_data_insertion_performance_100(mongo_db: Database) -> None:
-    artists = mongo_db.artists
-    albums = mongo_db.albums
-    songs = mongo_db.songs
-    playlists = mongo_db.playlists
-    artists_albums = mongo_db.artists_albums
-    songs_playlists = mongo_db.songs_playlists
+def test_create_performance(mongo_db: Database, n: int = 100) -> None:
+    for _ in range(n):
+        artists = mongo_db.artists
+        albums = mongo_db.albums
+        songs = mongo_db.songs
+        playlists = mongo_db.playlists
+        artists_albums = mongo_db.artists_albums
+        songs_playlists = mongo_db.songs_playlists
 
-    albums.insert_many([{"name": faker.catch_phrase()} for _ in range(100)])
-    artists.insert_many([{
-        "name": faker.name(),
-        "albums": [albums.aggregate([{"$sample": {"size": 1}}]).next()['_id'] for _ in range(5)]
-    } for _ in range(100)])
-    songs.insert_many([{
-        "title": faker.sentence(),
-        "length": Decimal128(faker.pydecimal(left_digits=2, right_digits=2, positive=True)),
-        "rating": Decimal128(faker.pydecimal(left_digits=1, right_digits=1, positive=True)),
-        "yt_link": faker.url(),
-        "artist_id": artists.aggregate([{"$sample": {"size": 1}}]).next()['_id'],
-        "album_id": albums.aggregate([{"$sample": {"size": 1}}]).next()['_id']
-    } for _ in range(100)])
-    playlists.insert_many([{
-        "name": faker.catch_phrase(),
-        "songs": [songs.aggregate([{"$sample": {"size": 1}}]).next()['_id'] for _ in range(5)]
-    } for _ in range(100)])
-    artists_albums.insert_many([{
-        "artist_id": artists.aggregate([{"$sample": {"size": 1}}]).next()['_id'],
-        "album_id": albums.aggregate([{"$sample": {"size": 1}}]).next()['_id']
-    } for _ in range(100)])
-    songs_playlists.insert_many([{
-        "song_id": songs.aggregate([{"$sample": {"size": 1}}]).next()['_id'],
-        "playlist_id": playlists.aggregate([{"$sample": {"size": 1}}]).next()['_id']
-    } for _ in range(100)])
+        albums.insert_one({"name": faker.catch_phrase()})
+        artists.insert_one({"name": faker.name()})
+        songs.insert_many({
+            "title": faker.sentence(),
+            "length": Decimal128(faker.pydecimal(left_digits=2, right_digits=2, positive=True)),
+            "rating": Decimal128(faker.pydecimal(left_digits=1, right_digits=1, positive=True)),
+            "yt_link": faker.url(),
+            "artist_id": artists.aggregate([{"$sample": {"size": 1}}]).next()['_id'],
+            "album_id": albums.aggregate([{"$sample": {"size": 1}}]).next()['_id']
+        })
+        playlists.insert_many({"name": faker.catch_phrase()})
+        artists_albums.insert_many({
+            "artist_id": artists.aggregate([{"$sample": {"size": 1}}]).next()['_id'],
+            "album_id": albums.aggregate([{"$sample": {"size": 1}}]).next()['_id']
+        })
+        songs_playlists.insert_many({
+            "song_id": songs.aggregate([{"$sample": {"size": 1}}]).next()['_id'],
+            "playlist_id": playlists.aggregate([{"$sample": {"size": 1}}]).next()['_id']
+        })
 
 
 # @mongo_performance_test()
@@ -86,7 +81,7 @@ def test_data_insertion_performance_100(mongo_db: Database) -> None:
 #         collection.insert_one({"number": i})
 
 
-@mongo_performance_test(init_func=test_data_insertion_performance_100)
+@mongo_performance_test(init_func=init_mongo_db)
 def test_read_performance(mongo_db: Database) -> None:
     artists = mongo_db.artists
     # Performance testing for read operations
@@ -94,5 +89,5 @@ def test_read_performance(mongo_db: Database) -> None:
 
 
 if __name__ == "__main__":
-    test_data_insertion_performance_100()
+    test_create_performance()
     test_read_performance()
