@@ -23,7 +23,7 @@ def mongo_performance_test(init_func: Optional[Callable] = None, n_tests: int = 
                 if init_func:
                     print("Applying init function")
                     init_fn_kwargs = {"n": init_func_n} if init_func_n else {}
-                    init_func(**init_fn_kwargs)
+                    init_func(mongo_db, **init_fn_kwargs)
 
                 def to_time():
                     test_func(mongo_db, *args, **kwargs)
@@ -49,25 +49,21 @@ def init_mongo_db(mongo_db: Database) -> None:
 
 def insert_fake_data(mongo_db: Database, n: int) -> None:
     for _ in range(n):
-        artist_result = mongo_db.artists.insert_one({"name": faker.name()})
-        artist_id = artist_result.inserted_id
-        album_result = mongo_db.albums.insert_one({"name": faker.word()})
-        album_id = album_result.inserted_id
-        mongo_db.songs.insert_one({
+        artist_id = mongo_db.artists.insert_one({"name": faker.name()}).inserted_id
+        album_id = mongo_db.albums.insert_one({"name": faker.word()}).inserted_id
+        song_id = mongo_db.songs.insert_one({
             "title": faker.sentence(),
             "length": Decimal128(faker.pydecimal(left_digits=2, right_digits=2, positive=True)),
             "rating": Decimal128(faker.pydecimal(left_digits=1, right_digits=1, positive=True)),
             "yt_link": faker.url(),
             "artist_id": artist_id,
             "album_id": album_id
-        })
-        playlist_result = mongo_db.playlists.insert_one({"name": faker.catch_phrase()})
-        playlist_id = playlist_result.inserted_id
+        }).inserted_id
+        playlist_id = mongo_db.playlists.insert_one({"name": faker.catch_phrase()}).inserted_id
         mongo_db.artists_albums.insert_one({
             "artist_id": artist_id,
             "album_id": album_id
         })
-        song_id = mongo_db.songs.find_one(sort=[('_id', -1)])['_id']
         mongo_db.songs_playlists.insert_one({
             "song_id": song_id,
             "playlist_id": playlist_id
@@ -78,43 +74,26 @@ def insert_many_fake_data(mongo_db: Database, n: int) -> None:
     artists_data = [{"name": faker.name()} for _ in range(n)]
     albums_data = [{"name": faker.word()} for _ in range(n)]
     playlists_data = [{"name": faker.word()} for _ in range(n)]
-    mongo_db.artists.insert_many(artists_data)
-    mongo_db.albums.insert_many(albums_data)
-    mongo_db.playlists.insert_many(playlists_data)
-
-    artist_id = mongo_db.artists.find_one(sort=[('_id', -1)])['_id']
-    album_id = mongo_db.albums.find_one(sort=[('_id', -1)])['_id']
+    artists = mongo_db.artists.insert_many(artists_data).inserted_ids
+    albums = mongo_db.albums.insert_many(albums_data).inserted_ids
+    playlists = mongo_db.playlists.insert_many(playlists_data).inserted_ids
     songs_data = [
         {
             "title": faker.sentence(),
             "length": Decimal128(faker.pydecimal(left_digits=2, right_digits=2, positive=True)),
             "rating": Decimal128(faker.pydecimal(left_digits=1, right_digits=1, positive=True)),
             "yt_link": faker.url(),
-            "artist_id": artist_id,
-            "album_id": album_id,
+            "artist_id": artists[i % n],
+            "album_id": albums[i % n],
         }
-        for _ in range(n)
+        for i in range(n)
     ]
-    mongo_db.songs.insert_many(songs_data)
-
-    album_artist_data = [
-        {
-            "artist_id": artist_id,
-            "album_id": album_id,
-        }
-        for _ in range(n)
+    songs = mongo_db.songs.insert_many(songs_data).inserted_ids
+    album_artist_data = [{"artist_id": artist_id, "album_id": album_id} for artist_id, album_id in zip(artists, albums)]
+    playlist_song_data = [
+        {"song_id": song_id, "playlist_id": playlist_id} for song_id, playlist_id in zip(songs, playlists)
     ]
     mongo_db.artists_albums.insert_many(album_artist_data)
-
-    song_id = mongo_db.songs.find_one(sort=[('_id', -1)])['_id']
-    playlist_id = mongo_db.playlists.find_one(sort=[('_id', -1)])['_id']
-    playlist_song_data = [
-        {
-            "song_id": song_id,
-            "playlist_id": playlist_id,
-        }
-        for _ in range(n)
-    ]
     mongo_db.songs_playlists.insert_many(playlist_song_data)
 
 
@@ -130,4 +109,81 @@ def test_insert_many_performance(mongo_db: Database, n: int) -> None:
 
 @mongo_performance_test(init_func=insert_many_fake_data)
 def test_read_performance(mongo_db: Database) -> None:
-    ...
+    pipeline = [
+        {
+            "$lookup": {
+                "from": "songs_playlists",
+                "localField": "_id",
+                "foreignField": "song_id",
+                "as": "playlist_info"
+            }
+        },
+        {
+            "$unwind": "$playlist_info"
+        },
+        {
+            "$lookup": {
+                "from": "playlists",
+                "localField": "playlist_info.playlist_id",
+                "foreignField": "_id",
+                "as": "playlist"
+            }
+        },
+        {
+            "$unwind": "$playlist"
+        },
+        {
+            "$lookup": {
+                "from": "artists_albums",
+                "localField": "album_id",
+                "foreignField": "album_id",
+                "as": "artist_album"
+            }
+        },
+        {
+            "$unwind": "$artist_album"
+        },
+        {
+            "$lookup": {
+                "from": "artists",
+                "localField": "artist_album.artist_id",
+                "foreignField": "_id",
+                "as": "artist"
+            }
+        },
+        {
+            "$unwind": "$artist"
+        },
+        {
+            "$project": {
+                "playlist_id": "$playlist._id",
+                "playlist_name": "$playlist.name",
+                "song_id": "$_id",
+                "song_title": "$title",
+                "song_length": "$length",
+                "song_rating": "$rating",
+                "yt_link": "$yt_link",
+                "artist_id": "$artist._id",
+                "artist_name": "$artist.name",
+                "album_id": "$album_id",
+            }
+        }
+    ]
+    songs_in_playlist = mongo_db.songs.aggregate(pipeline)
+    _ = list(songs_in_playlist)
+
+
+@mongo_performance_test(init_func=insert_many_fake_data)
+def test_delete_performance(mongo_db: Database) -> None:
+    mongo_db.artists.delete_many({})
+    mongo_db.albums.delete_many({})
+    mongo_db.playlists.delete_many({})
+    mongo_db.songs.delete_many({})
+    mongo_db.artists_albums.delete_many({})
+    mongo_db.songs_playlists.delete_many({})
+
+
+@mongo_performance_test(init_func=insert_many_fake_data)
+def test_update_performance(mongo_db: Database) -> None:
+    mongo_db.artists.update_many({}, {"$set": {"name": "Updated Artist Name"}})
+    mongo_db.songs.update_many({}, {"$set": {"length": Decimal128("3.50")}})

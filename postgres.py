@@ -171,3 +171,23 @@ def test_insert_performance(connection: PgConnection, n: int) -> None:
 @postgres_performance_test()
 def test_insert_many_performance(connection: PgConnection, n: int) -> None:
     insert_many_fake_data(connection, n)
+
+
+@postgres_performance_test(init_func=insert_many_fake_data)
+def test_delete_performance(connection: PgConnection) -> None:
+    with connection.cursor() as cursor:
+        cursor.execute("DELETE FROM P_Playlists_have_S_Songs;")
+        cursor.execute("DELETE FROM S_Songs;")
+        cursor.execute("DELETE FROM Al_Albums_have_A_Artists;")
+        cursor.execute("DELETE FROM P_Playlists;")
+        cursor.execute("DELETE FROM Al_Albums;")
+        cursor.execute("DELETE FROM A_Artists;")
+    connection.commit()
+
+
+@postgres_performance_test(init_func=insert_many_fake_data)
+def test_update_performance(connection: PgConnection) -> None:
+    with connection.cursor() as cursor:
+        cursor.execute("UPDATE A_Artists SET A_Name = 'Updated Artist Name';")
+        cursor.execute("UPDATE S_Songs SET S_Length = 3.50;")
+    connection.commit()

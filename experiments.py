@@ -2,8 +2,8 @@ from plotting import plot_performance_comparison
 import postgres
 import mongo
 
-if __name__ == "__main__":
-    # # INSERTS
+
+def test_inserts() -> None:
     scaling_stages = [250, 500, 1_000, 2_000]
     insert_one_timings_mongo: list[float] = [mongo.test_insert_performance(n=n) for n in scaling_stages]  # type: ignore
     insert_one_timings_pg: list[float] = [postgres.test_insert_performance(n=n) for n in scaling_stages]  # type: ignore
@@ -25,11 +25,45 @@ if __name__ == "__main__":
         labels=['MongoDB Insert', 'MongoDB Insert Many', 'Postgres Insert', 'Postgres Insert Many'],
     )
 
-    # # READS
-    # scaling_stages = [1_000, 2_000, 10_000, 100_000]
-    # read_timings: list[float] = [test_read_performance(init_func_n=n) for n in scaling_stages]  # type: ignore
-    # plot_performance_test(
-    #     title='Postgres Read Performance (Songs in Playlist View)',
-    #     time_taken=read_timings,
-    #     scaling_stages=scaling_stages,
-    # )
+
+def test_reads() -> None:
+    scaling_stages = [250, 500, 1_000, 2_000]
+    read_timings_mongo: list[float] = [mongo.test_read_performance(init_func_n=n) for n in scaling_stages]  # type: ignore
+    read_timings_pg: list[float] = [postgres.test_read_performance(init_func_n=n) for n in scaling_stages]  # type: ignore
+    plot_performance_comparison(
+        title='MongoDB vs Postgres - Read Performance Comparison',
+        timings=[read_timings_mongo, read_timings_pg],
+        scaling_stages=scaling_stages,
+        labels=['MongoDB Read', 'Postgres Read'],
+    )
+
+
+def test_deletes() -> None:
+    scaling_stages = [250, 500, 1_000, 2_000]
+    delete_timings_mongo: list[float] = [mongo.test_delete_performance(init_func_n=n) for n in scaling_stages]  # type: ignore
+    delete_timings_pg: list[float] = [postgres.test_delete_performance(init_func_n=n) for n in scaling_stages]  # type: ignore
+    plot_performance_comparison(
+        title='MongoDB vs Postgres - Delete Performance Comparison',
+        timings=[delete_timings_mongo, delete_timings_pg],
+        scaling_stages=scaling_stages,
+        labels=['MongoDB Delete', 'Postgres Delete'],
+    )
+
+
+def test_updates() -> None:
+    scaling_stages = [250, 500, 1_000, 2_000]
+    update_timings_mongo: list[float] = [mongo.test_update_performance(init_func_n=n) for n in scaling_stages]  # type: ignore
+    update_timings_pg: list[float] = [postgres.test_update_performance(init_func_n=n) for n in scaling_stages]  # type: ignore
+    plot_performance_comparison(
+        title='MongoDB vs Postgres - Update Performance Comparison',
+        timings=[update_timings_mongo, update_timings_pg],
+        scaling_stages=scaling_stages,
+        labels=['MongoDB Update', 'Postgres Update'],
+    )
+
+
+if __name__ == "__main__":
+    # test_inserts()
+    # test_reads()
+    # test_deletes()
+    test_updates()
