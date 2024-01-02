@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="{{ url_for('static', filename= 'css/style.css') }}">
+    <title>KeanuBeats</title>
+    <script>
+        function showTable(tableId) {
+            document.getElementById('artists').style.display = 'none';
+            document.getElementById('albums').style.display = 'none';
+            document.getElementById('songs').style.display = 'none';
+            document.getElementById('playlists').style.display = 'none';
+            document.getElementById('playlist_view').style.display = 'none';
+
+            document.getElementById(tableId).style.display = 'table';
+
+            if (['artists', 'albums', 'songs', 'playlists'].includes(tableId)) {
+                document.getElementById('add_update_container').style.display = 'block';
+                document.getElementById('add_document_button').style.display = 'block';
+                document.getElementById('delete_document_button').style.display = 'block';
+                document.getElementById('update_document_button').style.display = 'block';
+            } else {
+                document.getElementById('add_update_container').style.display = 'none';
+                document.getElementById('add_document_button').style.display = 'none';
+                document.getElementById('delete_document_button').style.display = 'none';
+                document.getElementById('update_document_button').style.display = 'none';
+            }
+
+            if (tableId === 'artists') {
+                document.getElementById('artist_form').style.display = 'block';
+                document.getElementById('album_form').style.display = 'none';
+                document.getElementById('song_form').style.display = 'none';
+                document.getElementById('playlist_form').style.display = 'none';
+            } else if (tableId === 'albums') {
+                document.getElementById('artist_form').style.display = 'none';
+                document.getElementById('album_form').style.display = 'block';
+                document.getElementById('song_form').style.display = 'none';
+                document.getElementById('playlist_form').style.display = 'none';
+            } else if (tableId === 'songs') {
+                document.getElementById('artist_form').style.display = 'none';
+                document.getElementById('album_form').style.display = 'none';
+                document.getElementById('song_form').style.display = 'block';
+                document.getElementById('playlist_form').style.display = 'none';
+            } else if (tableId === 'playlists') {
+                document.getElementById('artist_form').style.display = 'none';
+                document.getElementById('album_form').style.display = 'none';
+                document.getElementById('song_form').style.display = 'none';
+                document.getElementById('playlist_form').style.display = 'block';
+            } else {
+                document.getElementById('artist_form').style.display = 'none';
+                document.getElementById('album_form').style.display = 'none';
+                document.getElementById('song_form').style.display = 'none';
+                document.getElementById('playlist_form').style.display = 'none';
+            }
+        }
+    </script>
+</head>
+<body>
+   <h1>Welcome to KeanuBeats</h1>
+   <form>
+        <label for="dataSelector">Select which table to display:</label>
+        <select id="dataSelector" onchange="showTable(this.value)">
+            <option value="artists" selected>Artists</option>
+            <option value="albums">Albums</option>
+            <option value="songs">Songs</option>
+            <option value="playlists">Playlists</option>
+            <option value="playlist_view">Playlist View</option>
+        </select>
+    </form>
+
+   <button id="add_document_button" style="display: none;">Add Document</button>
+
+   <button id="delete_document_button" style="display: none;">Delete Document</button>
+
+   <button id="update_document_button" style="display: none;">Update Document</button>
+
+   <div id="add_update_container" style="display: block;">
+        <form id="add_update_form">
+            <label for="document_id">Document ID:</label>
+            <input type="text" id="document_id" />
+
+        </form>
+       <div id="artist_form" style="display: block;">
+            <label for="artist_name">Artist Name:</label>
+            <input type="text" id="artist_name" />
+       </div>
+       <div id="album_form" style="display: none;">
+            <label for="album_name">Album Name:</label>
+            <input type="text" id="album_name" />
+       </div>
+       <div id="song_form" style="display: none;">
+            <label for="song_title">Song Title:</label>
+            <input type="text" id="song_title" />
+
+            <label for="song_length">Song Length:</label>
+            <input type="text" id="song_length" />
+
+            <label for="song_rating">Song Rating:</label>
+            <input type="text" id="song_rating" />
+
+            <label for="song_yt_link">Song YT Link:</label>
+            <input type="text" id="song_yt_link" />
+
+            <label for="song_artist_id">Song Artist ID:</label>
+            <input type="text" id="song_artist_id" />
+
+            <label for="song_album_id">Song Album ID:</label>
+            <input type="text" id="song_album_id" />
+       </div>
+       <div id="playlist_form" style="display: none;">
+            <label for="playlist_name">Playlist Name:</label>
+            <input type="text" id="playlist_name" />
+
+            <label for="playlist_songs">Playlist Songs:</label>
+            <input type="text" id="playlist_songs" />
+       </div>
+   </div>
+
+    <script>
+        document.getElementById('add_document_button').addEventListener('click', addDocument);
+        document.getElementById('delete_document_button').addEventListener('click', deleteDocument);
+        document.getElementById('update_document_button').addEventListener('click', updateDocument);
+
+        function addDocument() {
+            const selectedTable = document.getElementById('dataSelector');
+
+            const formData = new FormData();
+            formData.append('collection_name', selectedTable.value);
+
+            if (selectedTable.value === 'artists') {
+                formData.append('artist_name', document.getElementById('artist_name').value);
+            } else if (selectedTable.value === 'albums') {
+                formData.append('album_name', document.getElementById('album_name').value);
+            } else if (selectedTable.value === 'songs') {
+                formData.append('song_title', document.getElementById('song_title').value);
+                formData.append('song_length', document.getElementById('song_length').value);
+                formData.append('song_rating', document.getElementById('song_rating').value);
+                formData.append('song_yt_link', document.getElementById('song_yt_link').value);
+                formData.append('song_artist_id', document.getElementById('song_artist_id').value);
+                formData.append('song_album_id', document.getElementById('song_album_id').value);
+            } else if (selectedTable.value === 'playlists') {
+                formData.append('playlist_name', document.getElementById('playlist_name').value);
+                formData.append('playlist_songs', document.getElementById('playlist_songs').value);
+            }
+
+            fetch('add_document', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+        }
+
+        function deleteDocument() {
+            const selectedTable = document.getElementById('dataSelector');
+
+            const formData = new FormData();
+            formData.append('document_id', document.getElementById('document_id').value);
+            formData.append('collection_name', selectedTable.value);
+
+            fetch('delete_document', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+        }
+
+        function updateDocument() {
+            const selectedTable = document.getElementById('dataSelector');
+
+            const formData = new FormData();
+            formData.append('document_id', document.getElementById('document_id').value);
+            formData.append('collection_name', selectedTable.value);
+
+            if (selectedTable.value === 'artists') {
+                formData.append('artist_name', document.getElementById('artist_name').value);
+            } else if (selectedTable.value === 'albums') {
+                formData.append('album_name', document.getElementById('album_name').value);
+            } else if (selectedTable.value === 'songs') {
+                formData.append('song_title', document.getElementById('song_title').value);
+                formData.append('song_length', document.getElementById('song_length').value);
+                formData.append('song_rating', document.getElementById('song_rating').value);
+                formData.append('song_yt_link', document.getElementById('song_yt_link').value);
+                formData.append('song_artist_id', document.getElementById('song_artist_id').value);
+                formData.append('song_album_id', document.getElementById('song_album_id').value);
+            } else if (selectedTable.value === 'playlists') {
+                formData.append('playlist_name', document.getElementById('playlist_name').value);
+                formData.append('playlist_songs', document.getElementById('playlist_songs').value);
+            }
+
+            fetch('update_document', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+        }
+    </script>
+
+    <table id="artists" style="display: table;">
+        <tr>
+            <th></th>
+            <th>Artist ID</th>
+            <th>Artist Name</th>
+        </tr>
+        {% for row in artists_result %}
+        <tr>
+            <td class="row_number">{{ row.row_number }}</td>
+            <td>{{ row._id }}</td>
+            <td>{{ row.name }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <table id="albums" style="display: none;">
+        <tr>
+            <th></th>
+            <th>Album ID</th>
+            <th>Album Name</th>
+        </tr>
+        {% for row in albums_result %}
+        <tr>
+            <td class="row_number">{{ row.row_number }}</td>
+            <td>{{ row._id }}</td>
+            <td>{{ row.name }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <table id="songs" style="display: none;">
+        <tr>
+            <th></th>
+            <th>Song ID</th>
+            <th>Song Title</th>
+            <th>Song Length</th>
+            <th>Song Rating</th>
+            <th>Song YT Link</th>
+            <th>Artist ID</th>
+            <th>Album ID</th>
+        </tr>
+        {% for row in songs_result %}
+        <tr>
+            <td class="row_number">{{ row.row_number }}</td>
+            <td>{{ row._id }}</td>
+            <td>{{ row.title }}</td>
+            <td>{{ row.length }}</td>
+            <td>{{ row.rating }}</td>
+            <td>{{ row.yt_link }}</td>
+            <td>{{ row.artist_id }}</td>
+            <td>{{ row.album_id }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+   <table id="playlists" style="display: none;">
+        <tr>
+            <th></th>
+            <th>Playlist ID</th>
+            <th>Playlist Name</th>
+            <th>Songs</th>
+        </tr>
+        {% for row in playlists_result %}
+        <tr>
+            <td class="row_number">{{ row.row_number }}</td>
+            <td>{{ row._id }}</td>
+            <td>{{ row.name }}</td>
+            <td>{{ row.songs }}</td>
+        </tr>
+        {% endfor %}
+   </table>
+
+   <table id="playlist_view" style="display: none;">
+        <tr>
+            <th></th>
+            <th>Playlist ID</th>
+            <th>Playlist Name</th>
+            <th>Song ID</th>
+            <th>Song Title</th>
+            <th>Song Length</th>
+            <th>Song Rating</th>
+            <th>Song YT Link</th>
+            <th>Artist ID</th>
+            <th>Artist Name</th>
+            <th>Album ID</th>
+            <th>Album Name</th>
+        </tr>
+        {% for row in query_result %}
+        <tr>
+            <td class="row_number">{{ row.row_number }}</td>
+            <td>{{ row.playlists_id }}</td>
+            <td>{{ row.playlists_name }}</td>
+            <td>{{ row.songs_id }}</td>
+            <td>{{ row.songs_title }}</td>
+            <td>{{ row.songs_length }}</td>
+            <td>{{ row.songs_rating }}</td>
+            <td>{{ row.songs_yt_link }}</td>
+            <td>{{ row.artists_id }}</td>
+            <td>{{ row.artists_name }}</td>
+            <td>{{ row.albums_id }}</td>
+            <td>{{ row.albums_name }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

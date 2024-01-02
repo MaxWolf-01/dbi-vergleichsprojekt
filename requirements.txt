@@ -4,3 +4,4 @@ testcontainers==3.7.1
 faker==21.0.0
 sqlalchemy==2.0.23
 matplotlib
+flask~=3.0.0
