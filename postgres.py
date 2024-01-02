@@ -13,7 +13,7 @@ faker: Faker = Faker()
 def postgres_performance_test(init_func: Optional[Callable] = None, n_tests: int = 10) -> Callable:
     def decorator(test_func: Callable) -> Callable:
         @wraps(test_func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: Any, init_func_n: int | None = None, **kwargs: Any) -> Any:
             with PostgresContainer("postgres:latest") as postgres:
                 db_url: str = postgres.get_connection_url()
                 db_url = db_url.replace('postgresql+psycopg2://', 'postgresql://')
@@ -21,7 +21,9 @@ def postgres_performance_test(init_func: Optional[Callable] = None, n_tests: int
                 create_postgres_schema(connection)
 
                 if init_func:
-                    init_func(connection)
+                    print("Applying init function")
+                    init_fn_kwargs = {"n": init_func_n} if init_func_n else {}
+                    init_func(connection, **init_fn_kwargs)
 
                 def to_time():
                     test_func(connection, *args, **kwargs)
@@ -29,7 +31,8 @@ def postgres_performance_test(init_func: Optional[Callable] = None, n_tests: int
                 timer = Timer(to_time)
                 time_taken = timer.timeit(number=n_tests)
 
-                print(f"'{test_func.__name__}' Completed - Time taken: {time_taken:.4f} seconds")
+                print(f"'{test_func.__name__}({args, kwargs})' "
+                      f"{n_tests} Tests Completed - Time taken: {time_taken:.4f} seconds")
 
                 connection.close()
                 return time_taken
@@ -105,23 +108,12 @@ def create_postgres_schema(conection: PgConnection) -> None:
     conection.commit()
 
 
-def insert_fake_data_postgres(connection: PgConnection, num_entries: int = 100) -> None:
+def insert_fake_data(connection: PgConnection, n: int) -> None:
     with connection.cursor() as cursor:
-        for _ in range(num_entries):
-            # Inserting Artists
-            artist_name = faker.name()
-            cursor.execute("INSERT INTO A_Artists (A_Name) VALUES (%s)", (artist_name,))
-
-            # Inserting Albums
-            album_name = faker.catch_phrase()
-            cursor.execute("INSERT INTO Al_Albums (Al_Name) VALUES (%s)", (album_name,))
-
-            # Inserting Playlists
-            playlist_name = faker.catch_phrase()
-            cursor.execute("INSERT INTO P_Playlists (P_Name) VALUES (%s)", (playlist_name,))
-
-            # Inserting Songs
-            song_title = faker.sentence()
+        for _ in range(n):
+            cursor.execute("INSERT INTO A_Artists (A_Name) VALUES (%s)", (faker.name(),))
+            cursor.execute("INSERT INTO Al_Albums (Al_Name) VALUES (%s)", (faker.catch_phrase(),))
+            cursor.execute("INSERT INTO P_Playlists (P_Name) VALUES (%s)", (faker.catch_phrase(),))
             song_title = faker.sentence()
             song_length = round(faker.pydecimal(left_digits=2, right_digits=2, positive=True), 2)
             song_rating = round(faker.pydecimal(left_digits=1, right_digits=1, positive=True), 1)
@@ -129,15 +121,42 @@ def insert_fake_data_postgres(connection: PgConnection, num_entries: int = 100) 
             cursor.execute("""INSERT INTO S_Songs (S_Title, S_Length, S_Rating, S_YT_Link, S_Al_ID) 
                 VALUES (%s, %s, %s, %s, (SELECT Al_ID FROM Al_Albums ORDER BY RANDOM() LIMIT 1))
                 """, (song_title, song_length, song_rating, yt_link))
+            cursor.execute("""INSERT INTO Al_Albums_have_A_Artists (Al_ID, A_ID)
+                VALUES ((SELECT Al_ID FROM Al_Albums ORDER BY RANDOM() LIMIT 1), (SELECT A_ID FROM A_Artists ORDER BY RANDOM() LIMIT 1))
+                """)
+            cursor.execute("""INSERT INTO P_Playlists_have_S_Songs (P_ID, S_ID)
+                VALUES ((SELECT P_ID FROM P_Playlists ORDER BY RANDOM() LIMIT 1), (SELECT S_ID FROM S_Songs ORDER BY RANDOM() LIMIT 1))
+                """)
     connection.commit()
 
 
-@postgres_performance_test()
-def test_data_insertion_performance(connection: PgConnection) -> None:
-    ...
+def insert_many_fake_data(connection: PgConnection, n: int) -> None:
+    cursor = connection.cursor()
+
+    artists_data = [(faker.name(),) for _ in range(n)]
+    albums_data = [(faker.word(),) for _ in range(n)]
+    playlists_data = [(faker.word(),) for _ in range(n)]
+    songs_data = [
+        (faker.sentence(), faker.random_number(digits=2), faker.random_number(digits=1), faker.url(), i + 1)
+        for i in range(n)
+    ]
+    album_artist_data = [(i + 1, i + 1) for i in range(n)]
+    playlist_song_data = [(i + 1, i + 1) for i in range(n)]
+
+    cursor.executemany("INSERT INTO A_Artists (A_Name) VALUES (%s);", artists_data)
+    cursor.executemany("INSERT INTO Al_Albums (Al_Name) VALUES (%s);", albums_data)
+    cursor.executemany("INSERT INTO Al_Albums_have_A_Artists (Al_ID, A_ID) VALUES (%s, %s);", album_artist_data)
+    cursor.executemany("INSERT INTO P_Playlists (P_Name) VALUES (%s);", playlists_data)
+    cursor.executemany(
+        "INSERT INTO S_Songs (S_Title, S_Length, S_Rating, S_YT_Link, S_Al_ID) VALUES (%s, %s, %s, %s, %s);",
+        songs_data)
+    cursor.executemany("INSERT INTO P_Playlists_have_S_Songs (P_ID, S_ID) VALUES (%s, %s);", playlist_song_data)
+
+    connection.commit()
+    cursor.close()
 
 
-@postgres_performance_test(init_func=insert_fake_data_postgres)
+@postgres_performance_test(init_func=insert_many_fake_data)
 def test_read_performance(connection: PgConnection) -> None:
     with connection.cursor() as cursor:
         cursor.execute("SELECT * FROM SongsInAPlaylist")
@@ -145,33 +164,10 @@ def test_read_performance(connection: PgConnection) -> None:
 
 
 @postgres_performance_test()
-def test_create_performance(connection: PgConnection, n: int = 100) -> None:
-    cursor = connection.cursor()
-    for _ in range(n):  # Adjust for scalability
-        cursor.execute("INSERT INTO A_Artists (A_Name) VALUES (%s) RETURNING A_ID;", (faker.name(),))
-        artist_id = cursor.fetchone()[0]
-
-        cursor.execute("INSERT INTO Al_Albums (Al_Name) VALUES (%s) RETURNING Al_ID;", (faker.word(),))
-        album_id = cursor.fetchone()[0]
-
-        cursor.execute("INSERT INTO Al_Albums_have_A_Artists (Al_ID, A_ID) VALUES (%s, %s);", (album_id, artist_id))
-
-        cursor.execute("INSERT INTO P_Playlists (P_Name) VALUES (%s) RETURNING P_ID;", (faker.word(),))
-        playlist_id = cursor.fetchone()[0]
-
-        cursor.execute("""
-            INSERT INTO S_Songs (S_Title, S_Length, S_Rating, S_YT_Link, S_Al_ID) 
-            VALUES (%s, %s, %s, %s, %s) RETURNING S_ID;
-            """, (
-        faker.sentence(), faker.random_number(digits=2), faker.random_number(digits=1), faker.url(), album_id))
-        song_id = cursor.fetchone()[0]
-
-        cursor.execute("INSERT INTO P_Playlists_have_S_Songs (P_ID, S_ID) VALUES (%s, %s);", (playlist_id, song_id))
-    connection.commit()
-    cursor.close()
+def test_insert_performance(connection: PgConnection, n: int) -> None:
+    insert_fake_data(connection, n)
 
 
-if __name__ == "__main__":
-    test_read_performance()
-    test_create_performance()
-    test_create_performance(n=1000)
+@postgres_performance_test()
+def test_insert_many_performance(connection: PgConnection, n: int) -> None:
+    insert_many_fake_data(connection, n)
