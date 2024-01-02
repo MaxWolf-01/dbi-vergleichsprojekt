@@ -184,3 +184,79 @@ def test_delete_performance(mongo_db: Database) -> None:
 def test_update_performance(mongo_db: Database) -> None:
     mongo_db.artists.update_many({}, {"$set": {"name": "Updated Artist Name"}})
     mongo_db.songs.update_many({}, {"$set": {"length": Decimal128("3.50")}})
+
+
+def insert_many_unique(mongo_db, n) -> None:
+    insert_many_fake_data(mongo_db, n)
+    mongo_db.songs.create_index([("yt_link", pymongo.ASCENDING)], unique=True)
+
+
+@mongo_performance_test()
+def test_unique_insert_performance(mongo_db: Database, n) -> None:
+    insert_fake_data(mongo_db, n)
+
+
+@mongo_performance_test(init_func=insert_many_unique)
+def test_unique_read_performance(mongo_db) -> None:
+    pipeline = [
+        {
+            "$lookup": {
+                "from": "songs_playlists",
+                "localField": "_id",
+                "foreignField": "song_id",
+                "as": "playlist_info"
+            }
+        },
+        {
+            "$unwind": "$playlist_info"
+        },
+        {
+            "$lookup": {
+                "from": "playlists",
+                "localField": "playlist_info.playlist_id",
+                "foreignField": "_id",
+                "as": "playlist"
+            }
+        },
+        {
+            "$unwind": "$playlist"
+        },
+        {
+            "$lookup": {
+                "from": "artists_albums",
+                "localField": "album_id",
+                "foreignField": "album_id",
+                "as": "artist_album"
+            }
+        },
+        {
+            "$unwind": "$artist_album"
+        },
+        {
+            "$lookup": {
+                "from": "artists",
+                "localField": "artist_album.artist_id",
+                "foreignField": "_id",
+                "as": "artist"
+            }
+        },
+        {
+            "$unwind": "$artist"
+        },
+        {
+            "$project": {
+                "playlist_id": "$playlist._id",
+                "playlist_name": "$playlist.name",
+                "song_id": "$_id",
+                "song_title": "$title",
+                "song_length": "$length",
+                "song_rating": "$rating",
+                "yt_link": "$yt_link",
+                "artist_id": "$artist._id",
+                "artist_name": "$artist.name",
+                "album_id": "$album_id",
+            }
+        }
+    ]
+    songs_in_playlist = mongo_db.songs.aggregate(pipeline)
+    _ = list(songs_in_playlist)
