@@ -4,3 +4,20 @@ h1 {
     text-align: center;
     padding: 10px;
 }
+
+table {
+    border: 2px lightpink solid;
+}
+
+th {
+    background: lightpink;
+    color: purple;
+}
+
+tr:nth-child(even) {
+            background-color: #f2f2f2;
+}
+
+#row_number {
+    background: lightpink;
+}
