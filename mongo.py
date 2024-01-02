@@ -1,6 +1,6 @@
-from functools import wraps
-from timeit import Timer
-from typing import Any, Callable, Optional
+import functools
+from contextlib import contextmanager
+from typing import Callable, Optional
 
 import pymongo
 from faker import Faker
@@ -8,33 +8,30 @@ from pymongo.database import Database
 from testcontainers.mongodb import MongoDbContainer
 from bson.decimal128 import Decimal128
 
+from performance_test import measure_performance
+
 faker: Faker = Faker()
 
 
-def mongo_performance_test(init_func: Optional[Callable] = None, n_tests: int = 10) -> Callable:
-    def decorator(test_func: Callable) -> Callable:
-        @wraps(test_func)
-        def wrapper(*args: Any, init_func_n: int | None = None, **kwargs: Any) -> Any:
-            with MongoDbContainer() as mongo:
-                connection_string: str = mongo.get_connection_url()
-                mongo_client: pymongo.MongoClient = pymongo.MongoClient(connection_string)
-                mongo_db: Database = mongo_client["DBIMusicPlayer"]
+def mongo_performance_test(init_func: Optional[Callable] = None):
+    @contextmanager
+    def mongo_context():
+        mongo = MongoDbContainer()
+        mongo.start()
+        connection_string = mongo.get_connection_url()
+        mongo_client = pymongo.MongoClient(connection_string)
+        db = mongo_client["DBIMusicPlayer"]  # Adjust the database name as needed
+        try:
+            yield db
+        finally:
+            mongo_client.close()
+            mongo.stop()
 
-                if init_func:
-                    print("Applying init function")
-                    init_fn_kwargs = {"n": init_func_n} if init_func_n else {}
-                    init_func(mongo_db, **init_fn_kwargs)
-
-                def to_time():
-                    test_func(mongo_db, *args, **kwargs)
-
-                timer = Timer(to_time)
-                time_taken = timer.timeit(number=n_tests)
-
-                print(f"'{test_func.__name__}({args, kwargs})' "
-                      f"{n_tests} Tests Completed - Time taken: {time_taken:.4f} seconds")
-
-                return time_taken
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, n_tests: int = 10, **kwargs):
+            with mongo_context() as db:
+                return measure_performance(db=db, test_func=func, init_func=init_func, n_tests=n_tests, *args, **kwargs)
 
         return wrapper
 

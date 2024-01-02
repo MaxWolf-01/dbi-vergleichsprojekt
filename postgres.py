@@ -1,41 +1,36 @@
-from functools import wraps
-from timeit import Timer
-from typing import Any, Callable, Optional
+import functools
+from contextlib import contextmanager
+from typing import Callable, Optional
 
 import psycopg2
 from faker import Faker
 from psycopg2.extensions import connection as PgConnection
 from testcontainers.postgres import PostgresContainer
 
+from performance_test import measure_performance
+
 faker: Faker = Faker()
 
 
-def postgres_performance_test(init_func: Optional[Callable] = None, n_tests: int = 10) -> Callable:
-    def decorator(test_func: Callable) -> Callable:
-        @wraps(test_func)
-        def wrapper(*args: Any, init_func_n: int | None = None, **kwargs: Any) -> Any:
-            with PostgresContainer("postgres:latest") as postgres:
-                db_url: str = postgres.get_connection_url()
-                db_url = db_url.replace('postgresql+psycopg2://', 'postgresql://')
-                connection: PgConnection = psycopg2.connect(db_url)
-                create_postgres_schema(connection)
+def postgres_performance_test(init_func: Optional[Callable] = None):
+    @contextmanager
+    def postgres_context():
+        postgres = PostgresContainer("postgres:latest")
+        postgres.start()
+        db_url = postgres.get_connection_url().replace('postgresql+psycopg2://', 'postgresql://')
+        connection = psycopg2.connect(db_url)
+        create_postgres_schema(connection)
+        try:
+            yield connection
+        finally:
+            connection.close()
+            postgres.stop()
 
-                if init_func:
-                    print("Applying init function")
-                    init_fn_kwargs = {"n": init_func_n} if init_func_n else {}
-                    init_func(connection, **init_fn_kwargs)
-
-                def to_time():
-                    test_func(connection, *args, **kwargs)
-
-                timer = Timer(to_time)
-                time_taken = timer.timeit(number=n_tests)
-
-                print(f"'{test_func.__name__}({args, kwargs})' "
-                      f"{n_tests} Tests Completed - Time taken: {time_taken:.4f} seconds")
-
-                connection.close()
-                return time_taken
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, n_tests: int = 10, **kwargs):
+            with postgres_context() as db:
+                return measure_performance(db=db, test_func=func, n_tests=n_tests, init_func=init_func, *args, **kwargs)
 
         return wrapper
 
