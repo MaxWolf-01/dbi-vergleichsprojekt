@@ -146,7 +146,22 @@ def update_document():
     updates = {}
     for key, value in request.form.items():
         if key != 'document_id' and key != 'collection_name' and value:
-            updates['name'] = value
+            if key == 'artist_name' or key == 'album_name' or key == 'playlist_name':
+                updates['name'] = value
+            elif key == 'song_title':
+                updates['title'] = value
+            elif key == 'song_length':
+                updates['length'] = value
+            elif key == 'song_rating':
+                updates['rating'] = value
+            elif key == 'song_yt_link':
+                updates['yt_link'] = value
+            elif key == 'song_artist_id':
+                updates['artist_id'] = value
+            elif key == 'song_album_id':
+                updates['album_id'] = value
+            elif key == 'playlist_songs':
+                updates['songs'] = value
 
     print(document_id)
     print(updates)

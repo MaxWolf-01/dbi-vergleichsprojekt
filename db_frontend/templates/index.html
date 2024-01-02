@@ -73,9 +73,6 @@
             <label for="document_id">Document ID:</label>
             <input type="text" id="document_id" />
 
-            <label for="new_field_value">New Field Value:</label>
-            <input type="text" id="new_field_value" />
-
         </form>
        <div id="artist_form" style="display: block;">
             <label for="artist_name">Artist Name:</label>
@@ -107,6 +104,9 @@
        <div id="playlist_form" style="display: none;">
             <label for="playlist_name">Playlist Name:</label>
             <input type="text" id="playlist_name" />
+
+            <label for="playlist_songs">Playlist Songs:</label>
+            <input type="text" id="playlist_songs" />
        </div>
    </div>
 
@@ -134,6 +134,7 @@
                 formData.append('song_album_id', document.getElementById('song_album_id').value);
             } else if (selectedTable.value === 'playlists') {
                 formData.append('playlist_name', document.getElementById('playlist_name').value);
+                formData.append('playlist_songs', document.getElementById('playlist_songs').value);
             }
 
             fetch('add_document', {
@@ -177,6 +178,7 @@
                 formData.append('song_album_id', document.getElementById('song_album_id').value);
             } else if (selectedTable.value === 'playlists') {
                 formData.append('playlist_name', document.getElementById('playlist_name').value);
+                formData.append('playlist_songs', document.getElementById('playlist_songs').value);
             }
 
             fetch('update_document', {
@@ -226,9 +228,7 @@
             <th>Song Rating</th>
             <th>Song YT Link</th>
             <th>Artist ID</th>
-            <th>Artist Name</th>
             <th>Album ID</th>
-            <th>Album Name</th>
         </tr>
         {% for row in songs_result %}
         <tr>
@@ -249,12 +249,14 @@
             <th></th>
             <th>Playlist ID</th>
             <th>Playlist Name</th>
+            <th>Songs</th>
         </tr>
         {% for row in playlists_result %}
         <tr>
             <td class="row_number">{{ row.row_number }}</td>
             <td>{{ row._id }}</td>
             <td>{{ row.name }}</td>
+            <td>{{ row.songs }}</td>
         </tr>
         {% endfor %}
    </table>
