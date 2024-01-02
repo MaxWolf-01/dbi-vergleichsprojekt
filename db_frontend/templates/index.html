@@ -16,8 +16,14 @@
 
             if (['artists', 'albums', 'songs', 'playlists'].includes(tableId)) {
                 document.getElementById('add_update_container').style.display = 'block';
+                document.getElementById('add_document_button').style.display = 'block';
+                document.getElementById('delete_document_button').style.display = 'block';
+                document.getElementById('update_document_button').style.display = 'block';
             } else {
                 document.getElementById('add_update_container').style.display = 'none';
+                document.getElementById('add_document_button').style.display = 'none';
+                document.getElementById('delete_document_button').style.display = 'none';
+                document.getElementById('update_document_button').style.display = 'none';
             }
 
             if (tableId === 'artists') {
@@ -62,11 +68,11 @@
         </select>
     </form>
 
-   <button id="add_document_button">Add Document</button>
+   <button id="add_document_button" style="display: none;">Add Document</button>
 
-   <button id="delete_document_button">Delete Document</button>
+   <button id="delete_document_button" style="display: none;">Delete Document</button>
 
-   <button id="update_document_button">Update Document</button>
+   <button id="update_document_button" style="display: none;">Update Document</button>
 
    <div id="add_update_container" style="display: block;">
         <form id="add_update_form">
