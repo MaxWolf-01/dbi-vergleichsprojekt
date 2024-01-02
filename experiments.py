@@ -133,10 +133,65 @@ def test_updates() -> None:
         scaling_stages=SCALING_STAGES
     )
 
+def test_reads_unique():
+    n = 100
+    n_tests = 1000
+    read_mean_std_mongo: tuple[float, float] = mongo.test_unique_read_performance(n=n, n_tests=n_tests)  # type: ignore
+    read_mean_std_pg: tuple[float, float] = postgres.test_read_performance(n=n, n_tests=n_tests)  # type: ignore
+
+    plot_performance_comparison(
+        title='MongoDB - with index vs Postgres - Read Performance Comparison',
+        results_list=[
+            [read_mean_std_mongo],
+            [read_mean_std_pg]
+        ],
+        labels=['MongoDB Read', 'Postgres Read'],
+        scaling_stages=[n]
+    )
+
+    plot_performance_comparison(
+        title='MongoDB (with index) vs Postgres - Read Performance Comparison at Scale',
+        results_list=[
+            extrapolate_performance(read_mean_std_mongo, n),
+            extrapolate_performance(read_mean_std_pg, n)
+        ],
+        labels=['MongoDB Read', 'Postgres Read'],
+        scaling_stages=SCALING_STAGES
+    )
+
+
+def test_insert_unique():
+    n = 30
+    n_tests = 1000
+    insert_one_mean_std_mongo: tuple[float, float] = mongo.test_unique_insert_performance(n=n, n_tests=n_tests)  # type: ignore
+    insert_one_mean_std_pg: tuple[float, float] = postgres.test_insert_performance(n=n, n_tests=n_tests)  # type: ignore
+
+    labels = ['MongoDB Insert', 'Postgres Insert']
+    plot_performance_comparison(
+        title='MongoDB - with index vs Postgres - Insert Performance Comparison',
+        results_list=[
+            [insert_one_mean_std_mongo],
+            [insert_one_mean_std_pg],
+        ],
+        labels=labels,
+        scaling_stages=[n]
+    )
+
+    plot_performance_comparison(
+        title='MongoDB (with index) vs Postgres - Insert Performance Comparison at Scale',
+        results_list=[
+            extrapolate_performance(insert_one_mean_std_mongo, n),
+            extrapolate_performance(insert_one_mean_std_pg, n),
+        ],
+        labels=labels,
+        scaling_stages=SCALING_STAGES
+    )
 
 
 if __name__ == "__main__":
     # test_inserts()
     # test_reads()
-    test_deletes()
+    # test_deletes()
     # test_updates()
+    # test_reads_unique()
+    test_insert_unique()
