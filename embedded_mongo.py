@@ -37,10 +37,10 @@ for _ in range(100):
     db.playlists.update_one({"_id": playlist_id}, {"$push": {"songs": song_id}})
 
 # %%
-print(f'First 5 Songs:\n')
+print('First 5 Songs:\n')
 for song in db.songs.find().limit(5):
     print(song)
-print(f'\nFirst 5 Playlists:\n')
+print('\nFirst 5 Playlists:\n')
 for playlist in db.playlists.find().limit(5):
     print(playlist)
 
@@ -67,7 +67,8 @@ pipeline = [
             'song_rating': '$rating',
             'song_yt_link': '$yt_link',
             'artist_names': '$artists',
-            'album_name': {'$cond': {'if': {'$isArray': '$playlist_info.artists'}, 'then': '$playlist_info.name', 'else': ''}}
+            'album_name': {
+                '$cond': {'if': {'$isArray': '$playlist_info.artists'}, 'then': '$playlist_info.name', 'else': ''}}
         }
     },
     {
@@ -79,3 +80,25 @@ results = db.songs.aggregate(pipeline)
 for result in results:
     print(dumps(result, indent=4))
 
+# %%
+
+print("\nAdd song to playlist\n---------------\n")
+playlist = db.playlists.find_one()
+print("BEFORE:\n", playlist)
+song = db.songs.find_one()
+db.playlists.update_one({"_id": playlist["_id"]}, {"$push": {"songs": song["_id"]}})
+playlist = db.playlists.find_one({"_id": playlist["_id"]})
+print("AFTER:\n", playlist)
+
+# %%
+
+
+print("\nDelete song from playlist\n---------------\n")
+playlist = db.playlists.find_one()
+song = db.songs.find_one()
+print("Playlist BEFORE deletion:\n", playlist)
+playlist_id = playlist['_id']
+song_id = song['_id']
+db.playlists.update_one({"_id": playlist_id}, {"$pull": {"songs": song_id}})
+playlist_after_deletion = db.playlists.find_one({"_id": playlist_id})
+print("Playlist AFTER deletion:\n", playlist_after_deletion)
